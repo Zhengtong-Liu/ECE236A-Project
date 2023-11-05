@@ -18,8 +18,8 @@ class MyClassifier:
         # objective: min()
         self.SVM_table = {}
         self.iteration = 100
-        self.lambda_list = np.arange(0.1, 2.0, 0.1) # Test acc : 0.926, Train Acc: 0.918
-        # self.lambda_list = [100.0] # Test Acc: 0.924, Train Acc: 0.914
+        self.lambda_list = np.arange(0.1, 2.0, 0.5) # Test acc : 0.926, Train Acc: 0.918; Test Acc: 0.878, Train Acc: 0.976
+        # self.lambda_list = [10.0] # Test Acc: 0.924, Train Acc: 0.914
 
     def train_single_svm(self, indices, trainX, trainY):
         # trainX: (b, f)
@@ -138,7 +138,7 @@ class MyClassifier:
                     vote[j] += j_vote
             # final_decision = np.argmax(vote)
             vote_list = [(index, vote[index]) for index in self.indices]
-            vote_list.sort(key=lambda x : x[1])
+            vote_list.sort(key=lambda x : x[1], reverse=True)
             final_decision = vote_list[0][0]
 
             predY.append(final_decision)
@@ -159,18 +159,18 @@ if __name__ == '__main__':
     from utils import *
     from sklearn.decomposition import PCA
     pca = PCA(n_components=10)
-    # data = prepare_synthetic_data()
-    data = prepare_mnist_data()
+    data = prepare_synthetic_data()
+    # data = prepare_mnist_data()
     svms = MyClassifier(K=3)
     # svms.train_single_svm((1, 2), data['trainX'], data['trainY'])
-    new_trainX = pca.fit_transform(data['trainX'])
-    new_testX = pca.transform(data['testX'])
+    # new_trainX = pca.fit_transform(data['trainX'])
+    # new_testX = pca.transform(data['testX'])
     # svms.train(data['trainX'], data['trainY'])
-    svms.train(new_trainX, data['trainY'])
+    svms.train(data['trainX'], data['trainY'])
     # pred = svms.predict(data['trainX'])
     # print(pred)
-    acc = svms.evaluate(new_testX, data['testY'])
-    acc2 = svms.evaluate(new_trainX, data['trainY'])
+    acc = svms.evaluate(data['testX'], data['testY'])
+    acc2 = svms.evaluate(data['trainX'], data['trainY'])
     # acc = svms.evaluate(data['testX'], data['testY'])
     # acc2 = svms.evaluate(data['trainX'], data['trainY'])
     print(f"Final Test Prediction Acc: {acc}, Train Acc: {acc2}")
