@@ -155,25 +155,25 @@ class MyClassifier:
         return accuracy
     
 
-if __name__ == '__main__':
-    from utils import *
-    from sklearn.decomposition import PCA
-    pca = PCA(n_components=10)
-    data = prepare_synthetic_data()
-    # data = prepare_mnist_data()
-    svms = MyClassifier(K=3)
-    # svms.train_single_svm((1, 2), data['trainX'], data['trainY'])
-    # new_trainX = pca.fit_transform(data['trainX'])
-    # new_testX = pca.transform(data['testX'])
-    # svms.train(data['trainX'], data['trainY'])
-    svms.train(data['trainX'], data['trainY'])
-    # pred = svms.predict(data['trainX'])
-    # print(pred)
-    acc = svms.evaluate(data['testX'], data['testY'])
-    acc2 = svms.evaluate(data['trainX'], data['trainY'])
-    # acc = svms.evaluate(data['testX'], data['testY'])
-    # acc2 = svms.evaluate(data['trainX'], data['trainY'])
-    print(f"Final Test Prediction Acc: {acc}, Train Acc: {acc2}")
+# if __name__ == '__main__':
+#     from utils import *
+#     from sklearn.decomposition import PCA
+#     pca = PCA(n_components=10)
+#     data = prepare_synthetic_data()
+#     # data = prepare_mnist_data()
+#     svms = MyClassifier(K=3)
+#     # svms.train_single_svm((1, 2), data['trainX'], data['trainY'])
+#     # new_trainX = pca.fit_transform(data['trainX'])
+#     # new_testX = pca.transform(data['testX'])
+#     # svms.train(data['trainX'], data['trainY'])
+#     svms.train(data['trainX'], data['trainY'])
+#     # pred = svms.predict(data['trainX'])
+#     # print(pred)
+#     acc = svms.evaluate(data['testX'], data['testY'])
+#     acc2 = svms.evaluate(data['trainX'], data['trainY'])
+#     # acc = svms.evaluate(data['testX'], data['testY'])
+#     # acc2 = svms.evaluate(data['trainX'], data['trainY'])
+#     print(f"Final Test Prediction Acc: {acc}, Train Acc: {acc2}")
 
     
 
@@ -187,15 +187,66 @@ class MyClustering:
         ### TODO: Initialize other parameters needed in your algorithm
         # examples: 
         # self.cluster_centers_ = None
-        
+        self.cluster_centers_ = None
+        self.num_features_ = None
+        self.num_train_ = None
     
-    def train(self, trainX):
+    def train_one_iter(self, trainX):
+        if self.cluster_centers_ is None:
+            max_coord = np.max(trainX, axis=0)
+            min_coord = np.min(trainX, axis=0)
+            self.cluster_centers_ = np.random.uniform(low=min_coord, high=max_coord, size=(self.K, self.num_features_))
+
+        norm_mat = np.zeros((self.num_train_, self.K))
+        for j in range(self.num_train_):
+            cur_sample = trainX[j]
+            cur_distance = cur_sample - self.cluster_centers_
+            cur_norm = np.square(np.linalg.norm(cur_distance, axis=1))
+            norm_mat[j] = cur_norm
+        big_M_scale = np.max(norm_mat, axis=0)
+        # big_M_scale = np.ones(self.K) * 1000
+        radius_vector = cp.Variable(self.K, 'radius')
+        binary_labels = cp.Variable((self.num_train_, self.K), 'binary_label')
+        objective = cp.Minimize(cp.sum(radius_vector))
+        constraints = [binary_labels >= 0, binary_labels <= 1]
+        
+        for k in range(self.K):
+            cur_norm_vector = norm_mat[:, k].flatten() 
+            cur_radius, cur_M_scale = radius_vector[k], big_M_scale[k]
+            cur_binary_labels = binary_labels[:, k]
+            constraints.append(( cur_norm_vector + cur_M_scale * cur_binary_labels <= (cur_radius + cur_M_scale)))
+        
+        constraints.extend([cp.sum(binary_labels, axis=1) == 1, radius_vector >= 0])
+        prob = cp.Problem(
+            objective,
+            constraints
+        )
+        prob.solve()
+        # print(prob)
+        # for variable in prob.variables():
+        #     print("Variable %s: value %s" % (variable.name(), variable.value))
+        # print(f"Problem status: {prob.status}")
+        return radius_vector.value, binary_labels.value
+        
+
+
+    def train(self, trainX, iteration=10):
         ''' Task 2-2 
             TODO: cluster trainX using LP(s) and store the parameters that discribe the identified clusters
         '''
-
-
-        # Update and teturn the cluster labels of the training data (trainX)
+        self.num_train_, self.num_features_ = trainX.shape
+        self.labels = np.zeros(self.num_train_, dtype=int)
+        for epoch in range(iteration):
+            radius, binary_labels = self.train_one_iter(trainX)
+            # print(f"binary labels: {binary_labels[:10, :]}")
+            self.labels = np.argmax(binary_labels, axis=1)
+            for k in range(self.K):
+                class_k_indices = np.where(self.labels == k)[0]
+                if len(class_k_indices >= 0):
+                    self.cluster_centers_[k] = np.mean(trainX[class_k_indices, :], axis=0)
+            # print(f"labels are {self.labels[:10]}, cluster centers are {self.cluster_centers_}")
+            print(f'====== Finish Iteration {epoch} of K-means ======')
+        # Update and return the cluster labels of the training data (trainX)
         return self.labels
     
     
@@ -204,48 +255,91 @@ class MyClustering:
             TODO: assign new data points to the existing clusters
         '''
         pred_labels = None
-
+        num_test = testX.shape[0]
+        pred_labels = np.zeros(num_test, dtype=int)
+        for t in range(num_test):
+            test_sample = testX[t]
+            pred_labels[t] = np.argmin(np.linalg.norm(test_sample - self.cluster_centers_, axis=1))
         # Return the cluster labels of the input data (testX)
         return pred_labels
     
 
     def evaluate_clustering(self,trainY):
-        label_reference = self.align_cluster_labels(self.labels, trainY)
+        print(self.labels[:10])
+        label_reference = self.get_class_cluster_reference(self.labels, trainY)
         aligned_labels = self.align_cluster_labels(self.labels, label_reference)
+        # print(trainY[:10])
+        # print(aligned_labels[:10])
         nmi = normalized_mutual_info_score(trainY, aligned_labels)
 
         return nmi
     
 
     def evaluate_classification(self, trainY, testX, testY):
-        pred_labels = self.infer_data_labels(testX)
-        label_reference = self.align_cluster_labels(self.labels, trainY)
+        pred_labels = self.infer_cluster(testX)
+        label_reference = self.get_class_cluster_reference(self.labels, trainY)
         aligned_labels = self.align_cluster_labels(pred_labels, label_reference)
         accuracy = accuracy_score(testY, aligned_labels)
 
         return accuracy
 
 
-    def get_class_cluster_reference(cluster_labels, true_labels):
+    def get_class_cluster_reference(self, cluster_labels, true_labels):
         ''' assign a class label to each cluster using majority vote '''
         label_reference = {}
         for i in range(len(np.unique(cluster_labels))):
             index = np.where(cluster_labels == i,1,0)
-            num = np.bincount(true_labels[index==1]).argmax()
-            label_reference[i] = num
-
+            if len(true_labels[index==1]) > 0:
+                num = np.bincount(true_labels[index==1]).argmax()
+                label_reference[i] = num
         return label_reference
     
     
-    def align_cluster_labels(cluster_labels, reference):
+    def align_cluster_labels(self, cluster_labels, reference):
         ''' update the cluster labels to match the class labels'''
         aligned_lables = np.zeros_like(cluster_labels)
         for i in range(len(cluster_labels)):
-            aligned_lables[i] = reference[cluster_labels[i]]
-
+            if cluster_labels[i] in reference:
+                aligned_lables[i] = reference[cluster_labels[i]]
+            else:
+                aligned_lables[i] = -1
         return aligned_lables
 
+if __name__ == '__main__':
+    from utils import *
 
+    # sync_data = prepare_synthetic_data()
+    # kmeans = MyClustering(K=5)
+    # kmeans.train(sync_data['trainX'], iteration=100)
+    # nmi = kmeans.evaluate_clustering(np.array(sync_data['trainY'], dtype=int))
+    # acc = kmeans.evaluate_classification(
+    #     np.array(sync_data['trainY'], dtype=int),
+    #     sync_data['testX'],
+    #     np.array(sync_data['testY'], dtype=int)
+    # )
+
+
+
+    from sklearn.manifold import TSNE
+    tsne = TSNE(n_components=2, perplexity=3, verbose=1)
+    mnist_data = prepare_mnist_data()
+    num_train = len(mnist_data['trainX'])
+    num_test = len(mnist_data['testX'])
+    print(num_train, num_test)
+    allX = np.concatenate([mnist_data['trainX']/255.0, mnist_data['testX']/255.0], axis=0)
+    allX_embedded = tsne.fit_transform(allX)
+    new_trainX = allX_embedded[:num_train]
+    new_testX = allX_embedded[num_train:]
+
+    kmeans = MyClustering(K=32)
+    kmeans.train(new_trainX, iteration=100)
+    nmi = kmeans.evaluate_clustering(np.array(mnist_data['trainY'], dtype=int))
+    acc = kmeans.evaluate_classification(
+        np.array(mnist_data['trainY'], dtype=int),
+        new_testX,
+        np.array(mnist_data['testY'], dtype=int)
+    )
+    print(f"Final Train NMI: {nmi}, Test ACC: {acc}")
 
 ##########################################################################
 #--- Task 3 ---#
