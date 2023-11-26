@@ -1,8 +1,10 @@
 import numpy as np
 from sklearn.metrics import normalized_mutual_info_score, accuracy_score
+from sklearn.cluster import KMeans
 ### TODO: import any other packages you need for your solution
 import cvxpy as cp
 import copy
+import random
 
 #--- Task 1 ---#
 class MyClassifier:  
@@ -344,15 +346,93 @@ if __name__ == '__main__':
 ##########################################################################
 #--- Task 3 ---#
 class MyLabelSelection:
-    def __init__(self, ratio):
+    def __init__(self, ratio, algo = 'rand'):
         self.ratio = ratio  # percentage of data to label
         ### TODO: Initialize other parameters needed in your algorithm
-
-    def select(self, trainX):
+        self.algo = algo
+        if self.algo == 'dis':
+            pass
+        elif self.algo == 'pseudo':
+            pass
+        
+    def select(self, trainX, debug = False):
         ''' Task 3-2'''
         data_to_label = None
-
-        # Return an index list that specifies which data points to label
-        return data_to_label
-
+        N = trainX.shape[0]
+        M = int(N * self.ratio)
+        if self.algo == 'rand':
+            return random.sample(range(N), int(N*self.ratio))
+        elif self.algo == 'dis':
+            return self.distance_selection(trainX, M, debug)
+        elif self.algo == 'pseudo':
+            return None
+        else:
+            raise NotImplementedError()
+    
+    def distance_selection(self, trainX: np.ndarray, M: int, debug = False):
+        kmeans = KMeans(n_clusters=3, max_iter=300).fit(trainX)
+        centroids, labels = kmeans.cluster_centers_, kmeans.labels_
+        dists = [[], [], []]
+        idxs = [[], [], []]
+        lens = [M // 3, M // 3, M - 2 * (M // 3)]
+        for i in range(trainX.shape[0]):
+            centr = centroids[labels[i]]
+            dists[labels[i]].append(np.linalg.norm(trainX[i] - centr, ord=2))
+            idxs[labels[i]].append(i)
+        ret = []
+        dists =  [np.array(dist) for dist in dists]
+        for i in range(3):
+            sorted_idxs = np.argsort(-dists[i])
+            ret += np.array(idxs[i], dtype=np.int32)[sorted_idxs[:lens[i]]].tolist()
+        if debug:
+            return ret, labels
+        return ret
+    
+    
+    
+if __name__ == '__main__':
+    from utils import *
+    from sklearn.decomposition import PCA
+    # pca = PCA(n_components=10)
+    data = prepare_synthetic_data()
+    # # data = prepare_mnist_data()
+    # svms = MyClassifier(K=3)
+    # # svms.train_single_svm((1, 2), data['trainX'], data['trainY'])
+    # # new_trainX = pca.fit_transform(data['trainX'])
+    # # new_testX = pca.transform(data['testX'])
+    # # svms.train(data['trainX'], data['trainY'])
+    # svms.train(data['trainX'], data['trainY'])
+    # # pred = svms.predict(data['trainX'])
+    # # print(pred)
+    # acc = svms.evaluate(data['testX'], data['testY'])
+    # acc2 = svms.evaluate(data['trainX'], data['trainY'])
+    # # acc = svms.evaluate(data['testX'], data['testY'])
+    # # acc2 = svms.evaluate(data['trainX'], data['trainY'])
+    # print(f"Final Test Prediction Acc: {acc}, Train Acc: {acc2}")
+    selectors = MyLabelSelection(0.05, algo = 'dis')
+    idxs, cluster_labels = selectors.select(data['trainX'], True)
+    model = MyClassifier(K=3)
+    print(data['trainY'][idxs])
+    model.train(data['trainX'][idxs], data['trainY'][idxs])
+    y_hat = model.predict(data['trainX'])
+    print(y_hat)
+    plt.scatter(data['trainX'][:, 0], data['trainX'][:, 1], c=y_hat)
+    plt.colorbar()
+    plt.savefig('predict.png'); plt.close()
+    acc = model.evaluate(data['testX'], data['testY'])
+    acc2 = model.evaluate(data['trainX'], data['trainY'])
+    print(f"Final Test Prediction Acc: {acc}, Train Acc: {acc2}")
+    
+    plt.scatter(data['trainX'][:, 0], data['trainX'][:, 1], c=data['trainY'])
+    plt.colorbar()
+    plt.savefig('1.png')
+    plt.close()
+    plt.scatter(data['trainX'][idxs, 0], data['trainX'][idxs, 1], c=data['trainY'][idxs])
+    plt.colorbar()
+    plt.savefig('2.png')
+    plt.close()
+    # plt.scatter(data['trainX'][idxs, 0], data['trainX'][idxs, 1], c=cluster_labels[idxs])
+    # plt.colorbar()
+    # plt.savefig('3.png')
+    # plt.close()
     
