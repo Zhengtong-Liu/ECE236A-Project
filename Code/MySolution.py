@@ -194,10 +194,30 @@ class MyClustering:
         self.num_train_ = None
     
     def train_one_iter(self, trainX):
+        # if self.cluster_centers_ is None:
+        #     max_coord = np.max(trainX, axis=0)
+        #     min_coord = np.min(trainX, axis=0)
+        #     self.cluster_centers_ = np.random.uniform(low=min_coord, high=max_coord, size=(self.K, self.num_features_))
         if self.cluster_centers_ is None:
-            max_coord = np.max(trainX, axis=0)
-            min_coord = np.min(trainX, axis=0)
-            self.cluster_centers_ = np.random.uniform(low=min_coord, high=max_coord, size=(self.K, self.num_features_))
+            chosen = set()
+            _id = np.random.randint(0, trainX.shape[0])
+            chosen.add(_id)
+            self.cluster_centers_ = [trainX[_id]]
+            for i in range(self.K-1):
+                rem_idxs = []
+                probs = []
+                for j in range(trainX.shape[0]):
+                    if j in chosen: continue
+                    rem_idxs.append(j)
+                    mn = float('inf')
+                    for centr in self.cluster_centers_:
+                        dis = np.linalg.norm(trainX[j]-centr, ord=2)
+                        mn = min(mn, dis)
+                    assert mn != float('inf')
+                    probs.append(mn**2)
+                _id = np.random.choice(rem_idxs, p=probs/np.sum(probs))
+                chosen.add(_id)
+                self.cluster_centers_.append(trainX[_id])
 
         norm_mat = np.zeros((self.num_train_, self.K))
         for j in range(self.num_train_):
@@ -307,41 +327,41 @@ class MyClustering:
                 aligned_lables[i] = -1
         return aligned_lables
 
-if __name__ == '__main__':
-    from utils import *
+# if __name__ == '__main__':
+#     from utils import *
 
-    # sync_data = prepare_synthetic_data()
-    # kmeans = MyClustering(K=5)
-    # kmeans.train(sync_data['trainX'], iteration=100)
-    # nmi = kmeans.evaluate_clustering(np.array(sync_data['trainY'], dtype=int))
-    # acc = kmeans.evaluate_classification(
-    #     np.array(sync_data['trainY'], dtype=int),
-    #     sync_data['testX'],
-    #     np.array(sync_data['testY'], dtype=int)
-    # )
+#     # sync_data = prepare_synthetic_data()
+#     # kmeans = MyClustering(K=5)
+#     # kmeans.train(sync_data['trainX'], iteration=100)
+#     # nmi = kmeans.evaluate_clustering(np.array(sync_data['trainY'], dtype=int))
+#     # acc = kmeans.evaluate_classification(
+#     #     np.array(sync_data['trainY'], dtype=int),
+#     #     sync_data['testX'],
+#     #     np.array(sync_data['testY'], dtype=int)
+#     # )
 
 
 
-    from sklearn.manifold import TSNE
-    tsne = TSNE(n_components=2, perplexity=3, verbose=1)
-    mnist_data = prepare_mnist_data()
-    num_train = len(mnist_data['trainX'])
-    num_test = len(mnist_data['testX'])
-    print(num_train, num_test)
-    allX = np.concatenate([mnist_data['trainX']/255.0, mnist_data['testX']/255.0], axis=0)
-    allX_embedded = tsne.fit_transform(allX)
-    new_trainX = allX_embedded[:num_train]
-    new_testX = allX_embedded[num_train:]
+#     from sklearn.manifold import TSNE
+#     tsne = TSNE(n_components=2, perplexity=3, verbose=1)
+#     mnist_data = prepare_mnist_data()
+#     num_train = len(mnist_data['trainX'])
+#     num_test = len(mnist_data['testX'])
+#     print(num_train, num_test)
+#     allX = np.concatenate([mnist_data['trainX']/255.0, mnist_data['testX']/255.0], axis=0)
+#     allX_embedded = tsne.fit_transform(allX)
+#     new_trainX = allX_embedded[:num_train]
+#     new_testX = allX_embedded[num_train:]
 
-    kmeans = MyClustering(K=32)
-    kmeans.train(new_trainX, iteration=100)
-    nmi = kmeans.evaluate_clustering(np.array(mnist_data['trainY'], dtype=int))
-    acc = kmeans.evaluate_classification(
-        np.array(mnist_data['trainY'], dtype=int),
-        new_testX,
-        np.array(mnist_data['testY'], dtype=int)
-    )
-    print(f"Final Train NMI: {nmi}, Test ACC: {acc}")
+#     kmeans = MyClustering(K=32)
+#     kmeans.train(new_trainX, iteration=100)
+#     nmi = kmeans.evaluate_clustering(np.array(mnist_data['trainY'], dtype=int))
+#     acc = kmeans.evaluate_classification(
+#         np.array(mnist_data['trainY'], dtype=int),
+#         new_testX,
+#         np.array(mnist_data['testY'], dtype=int)
+#     )
+#     print(f"Final Train NMI: {nmi}, Test ACC: {acc}")
 
 ##########################################################################
 #--- Task 3 ---#
@@ -370,69 +390,104 @@ class MyLabelSelection:
             raise NotImplementedError()
     
     def distance_selection(self, trainX: np.ndarray, M: int, debug = False):
-        kmeans = KMeans(n_clusters=3, max_iter=300).fit(trainX)
-        centroids, labels = kmeans.cluster_centers_, kmeans.labels_
-        dists = [[], [], []]
-        idxs = [[], [], []]
-        lens = [M // 3, M // 3, M - 2 * (M // 3)]
+        K = 8
+        kmeans = MyClustering(K)
+        kmeans.train(trainX, 100)
+        centroids, labels = kmeans.cluster_centers_, kmeans.labels
+        # kmeans = KMeans(n_clusters=K, max_iter=300).fit(trainX)
+        # centroids, labels = kmeans.cluster_centers_, kmeans.labels_
+        print(labels)
+        dists = [[] for i in range(K)]
+        idxs = [[] for i in range(K)]
+        lens = [M // K for i in range(K-1)]
+        lens.append(M - np.sum(lens))
         for i in range(trainX.shape[0]):
             centr = centroids[labels[i]]
             dists[labels[i]].append(np.linalg.norm(trainX[i] - centr, ord=2))
             idxs[labels[i]].append(i)
         ret = []
-        dists =  [np.array(dist) for dist in dists]
-        for i in range(3):
+        dists = [np.array(dist) for dist in dists]
+        for i in range(K):
             sorted_idxs = np.argsort(-dists[i])
             ret += np.array(idxs[i], dtype=np.int32)[sorted_idxs[:lens[i]]].tolist()
         if debug:
             return ret, labels
         return ret
     
-    
-    
 if __name__ == '__main__':
     from utils import *
     from sklearn.decomposition import PCA
-    # pca = PCA(n_components=10)
-    data = prepare_synthetic_data()
-    # # data = prepare_mnist_data()
-    # svms = MyClassifier(K=3)
-    # # svms.train_single_svm((1, 2), data['trainX'], data['trainY'])
-    # # new_trainX = pca.fit_transform(data['trainX'])
-    # # new_testX = pca.transform(data['testX'])
-    # # svms.train(data['trainX'], data['trainY'])
-    # svms.train(data['trainX'], data['trainY'])
-    # # pred = svms.predict(data['trainX'])
-    # # print(pred)
-    # acc = svms.evaluate(data['testX'], data['testY'])
-    # acc2 = svms.evaluate(data['trainX'], data['trainY'])
-    # # acc = svms.evaluate(data['testX'], data['testY'])
-    # # acc2 = svms.evaluate(data['trainX'], data['trainY'])
-    # print(f"Final Test Prediction Acc: {acc}, Train Acc: {acc2}")
-    selectors = MyLabelSelection(0.05, algo = 'dis')
-    idxs, cluster_labels = selectors.select(data['trainX'], True)
-    model = MyClassifier(K=3)
-    print(data['trainY'][idxs])
-    model.train(data['trainX'][idxs], data['trainY'][idxs])
-    y_hat = model.predict(data['trainX'])
-    print(y_hat)
-    plt.scatter(data['trainX'][:, 0], data['trainX'][:, 1], c=y_hat)
-    plt.colorbar()
-    plt.savefig('predict.png'); plt.close()
-    acc = model.evaluate(data['testX'], data['testY'])
-    acc2 = model.evaluate(data['trainX'], data['trainY'])
-    print(f"Final Test Prediction Acc: {acc}, Train Acc: {acc2}")
+    from sklearn.manifold import TSNE
+    task = 3
     
-    plt.scatter(data['trainX'][:, 0], data['trainX'][:, 1], c=data['trainY'])
-    plt.colorbar()
-    plt.savefig('1.png')
-    plt.close()
-    plt.scatter(data['trainX'][idxs, 0], data['trainX'][idxs, 1], c=data['trainY'][idxs])
-    plt.colorbar()
-    plt.savefig('2.png')
-    plt.close()
-    # plt.scatter(data['trainX'][idxs, 0], data['trainX'][idxs, 1], c=cluster_labels[idxs])
-    # plt.colorbar()
-    # plt.savefig('3.png')
-    # plt.close()
+    if task is 2:
+        # tsne = TSNE(n_components=2, perplexity=3, verbose=1)
+        # mnist_data = prepare_mnist_data()
+        mnist_data = prepare_synthetic_data()
+        num_train = len(mnist_data['trainX'])
+        num_test = len(mnist_data['testX'])
+        print(num_train, num_test)
+        # allX = np.concatenate([mnist_data['trainX']/255.0, mnist_data['testX']/255.0], axis=0)
+        allX = np.concatenate([mnist_data['trainX'], mnist_data['testX']], axis=0)
+        # allX_embedded = tsne.fit_transform(allX)
+        allX_embedded = allX
+        new_trainX = allX_embedded[:num_train]
+        new_testX = allX_embedded[num_train:]
+
+        kmeans = MyClustering(K=3)
+        kmeans.train(new_trainX, iteration=100)
+        nmi = kmeans.evaluate_clustering(np.array(mnist_data['trainY'], dtype=int))
+        acc = kmeans.evaluate_classification(
+            np.array(mnist_data['trainY'], dtype=int),
+            new_testX,
+            np.array(mnist_data['testY'], dtype=int)
+        )
+        print(f"Final Train NMI: {nmi}, Test ACC: {acc}")
+    elif task is 1:
+        pca = PCA(n_components=10)
+        data = prepare_synthetic_data()
+        # data = prepare_mnist_data()
+        svms = MyClassifier(K=3)
+        # svms.train_single_svm((1, 2), data['trainX'], data['trainY'])
+        # new_trainX = pca.fit_transform(data['trainX'])
+        # new_testX = pca.transform(data['testX'])
+        # svms.train(data['trainX'], data['trainY'])
+        svms.train(data['trainX'], data['trainY'])
+        # pred = svms.predict(data['trainX'])
+        # print(pred)
+        acc = svms.evaluate(data['testX'], data['testY'])
+        acc2 = svms.evaluate(data['trainX'], data['trainY'])
+        # acc = svms.evaluate(data['testX'], data['testY'])
+        # acc2 = svms.evaluate(data['trainX'], data['trainY'])
+        print(f"Final Test Prediction Acc: {acc}, Train Acc: {acc2}")
+    else:
+        data = prepare_synthetic_data()
+        # data = prepare_mnist_data()
+        selectors = MyLabelSelection(0.05, algo = 'dis')
+        idxs, cluster_labels = selectors.select(data['trainX'], True)
+        model = MyClassifier(K=3)
+        print(data['trainY'][idxs])
+        model.train(data['trainX'][idxs], data['trainY'][idxs])
+        y_hat = model.predict(data['trainX'])
+        print(y_hat)
+        plt.scatter(data['trainX'][:, 0], data['trainX'][:, 1], c=y_hat)
+        plt.colorbar()
+        plt.savefig('predict.png'); plt.close()
+        acc = model.evaluate(data['testX'], data['testY'])
+        acc2 = model.evaluate(data['trainX'], data['trainY'])
+        print(f"Final Test Prediction Acc: {acc}, Train Acc: {acc2}")
+        plt.close()
+        
+        plt.scatter(data['trainX'][:, 0], data['trainX'][:, 1], c=data['trainY'])
+        plt.colorbar()
+        plt.savefig('1.png')
+        plt.close()
+        plt.scatter(data['trainX'][idxs, 0], data['trainX'][idxs, 1], c=data['trainY'][idxs])
+        plt.colorbar()
+        plt.savefig('2.png')
+        plt.close()
+        plt.scatter(data['trainX'][:, 0], data['trainX'][:, 1], c=cluster_labels)
+        plt.colorbar()
+        plt.savefig('cluster.png')
+        plt.close()
     
