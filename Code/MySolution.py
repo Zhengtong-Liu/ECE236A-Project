@@ -258,20 +258,20 @@ class MyClustering:
             TODO: cluster trainX using LP(s) and store the parameters that discribe the identified clusters
         '''
         print('******* K =', self.K)
-        # self.num_train_, self.num_features_ = trainX.shape
-        # self.labels = np.zeros(self.num_train_, dtype=int)
-        # for epoch in range(iteration):
-        #     radius, binary_labels = self.train_one_iter(trainX)
-        #     # print(f"binary labels: {binary_labels[:10, :]}")
-        #     self.labels = np.argmax(binary_labels, axis=1)
-        #     for k in range(self.K):
-        #         class_k_indices = np.where(self.labels == k)[0]
-        #         if len(class_k_indices >= 0):
-        #             self.cluster_centers_[k] = np.mean(trainX[class_k_indices, :], axis=0)
-        #     # print(f"labels are {self.labels[:10]}, cluster centers are {self.cluster_centers_}")
-        #     print(f'====== Finish Iteration {epoch} of K-means ======')
-        kmeans = KMeans(n_clusters=self.K, max_iter=300).fit(trainX)
-        self.cluster_centers_, self.labels = kmeans.cluster_centers_, kmeans.labels_
+        self.num_train_, self.num_features_ = trainX.shape
+        self.labels = np.zeros(self.num_train_, dtype=int)
+        for epoch in range(iteration):
+            radius, binary_labels = self.train_one_iter(trainX)
+            # print(f"binary labels: {binary_labels[:10, :]}")
+            self.labels = np.argmax(binary_labels, axis=1)
+            for k in range(self.K):
+                class_k_indices = np.where(self.labels == k)[0]
+                if len(class_k_indices >= 0):
+                    self.cluster_centers_[k] = np.mean(trainX[class_k_indices, :], axis=0)
+            # print(f"labels are {self.labels[:10]}, cluster centers are {self.cluster_centers_}")
+            print(f'====== Finish Iteration {epoch} of K-means ======')
+        # kmeans = KMeans(n_clusters=self.K, max_iter=300).fit(trainX)
+        # self.cluster_centers_, self.labels = kmeans.cluster_centers_, kmeans.labels_
         # Update and return the cluster labels of the training data (trainX)
         return self.labels
     
@@ -496,20 +496,20 @@ if __name__ == '__main__':
     from utils import *
     from sklearn.decomposition import PCA
     from sklearn.manifold import TSNE
-    task = 3
+    task = 2
     
     if task is 2:
-        K = 20
-        # tsne = TSNE(n_components=2, perplexity=3, verbose=1)
+        K = 3
+        tsne = TSNE(n_components=2, perplexity=3, verbose=1)
         mnist_data = prepare_mnist_data()
         # mnist_data = prepare_synthetic_data()
         num_train = len(mnist_data['trainX'])
         num_test = len(mnist_data['testX'])
         print(num_train, num_test)
-        # allX = np.concatenate([mnist_data['trainX']/255.0, mnist_data['testX']/255.0], axis=0)
-        allX = np.concatenate([mnist_data['trainX'], mnist_data['testX']], axis=0)
-        # allX_embedded = tsne.fit_transform(allX)
-        allX_embedded = allX
+        allX = np.concatenate([mnist_data['trainX']/255.0, mnist_data['testX']/255.0], axis=0)
+        # allX = np.concatenate([mnist_data['trainX'], mnist_data['testX']], axis=0)
+        allX_embedded = tsne.fit_transform(allX)
+        # allX_embedded = allX
         new_trainX = allX_embedded[:num_train]
         new_testX = allX_embedded[num_train:]
 
@@ -544,7 +544,7 @@ if __name__ == '__main__':
         K = 3
         # data = prepare_synthetic_data()
         data = prepare_mnist_data()
-        selectors = MyLabelSelection(0.1, algo=algo, K=K)
+        selectors = MyLabelSelection(0.5, algo=algo, K=K)
         idxs, cluster_labels = selectors.select(data['trainX'], True)
         model = MyClassifier(K=3, ensemble=True)
         # print(data['trainY'][idxs])
