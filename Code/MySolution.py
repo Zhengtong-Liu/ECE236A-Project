@@ -8,7 +8,7 @@ import random
 
 #--- Task 1 ---#
 class MyClassifier:  
-    def __init__(self, K):
+    def __init__(self, K, ensemble=False):
         self.K = K  # number of classes
 
         ### TODO: Initialize other parameters needed in your algorithm
@@ -20,13 +20,15 @@ class MyClassifier:
         # objective: min()
         self.SVM_table = {}
         self.iteration = 100
-        self.lambda_list = np.arange(0.1, 2.0, 0.5) # Test acc : 0.926, Train Acc: 0.918; Test Acc: 0.878, Train Acc: 0.976
-        # self.lambda_list = [10.0] # Test Acc: 0.924, Train Acc: 0.914
+        if ensemble:
+            self.lambda_list = np.arange(0.1, 2.0, 0.5) # Test acc : 0.926, Train Acc: 0.918; Test Acc: 0.878, Train Acc: 0.976
+        else:
+            self.lambda_list = [10.0] # Test Acc: 0.924, Train Acc: 0.914
 
     def train_single_svm(self, indices, trainX, trainY):
         # trainX: (b, f)
         # trainY: (b, 1)
-        print(f"Shape of X: {trainX.shape}, shape of Y: {trainY.shape}")
+        # print(f"Shape of X: {trainX.shape}, shape of Y: {trainY.shape}")
         i, j = indices
         trainY_cur = copy.deepcopy(trainY)
         trainY_cur = np.logical_or(trainY_cur == i, trainY_cur == j)
@@ -43,7 +45,7 @@ class MyClassifier:
         trainY_cur = trainY_ij[trainY_cur.reshape(-1)] # only keep entries where the original label == i or == j
         trainY_cur = trainY_cur.astype(np.int8)
         batch_size, feature_dim = trainX_cur.shape
-        print(batch_size, feature_dim)
+        # print(batch_size, feature_dim)
 
         for lambd in self.lambda_list:
             w = cp.Variable(feature_dim, 'w')
@@ -73,10 +75,10 @@ class MyClassifier:
             prob.solve()
             self.SVM_table[indices+(lambd, )] = (w.value, b.value)
 
-            print('====== Finish Solving SVM ======')
-            print(prob)
-            for variable in prob.variables():
-                print("Variable %s: value %s" % (variable.name(), variable.value))
+            # print('====== Finish Solving SVM ======')
+            # print(prob)
+            # for variable in prob.variables():
+            #     print("Variable %s: value %s" % (variable.name(), variable.value))
 
             # objective = <x, w/||w||> - y
 
@@ -128,16 +130,15 @@ class MyClassifier:
             for index in self.indices:
                 vote[index] = 0
             for indices in self.SVM_table.keys():
-                for lambd in self.lambda_list:
-                    i, j, _ = indices
-                    svm = self.SVM_table[indices]
-                    logits = x @ svm[0] + svm[1]
-                    y_hat = logits > 0
-                    y_hat = logits.astype(np.int8)
-                    i_vote = y_hat.sum()
-                    j_vote = 1 - i_vote
-                    vote[i] += i_vote
-                    vote[j] += j_vote
+                i, j, _ = indices
+                svm = self.SVM_table[indices]
+                logits = x @ svm[0] + svm[1]
+                y_hat = logits > 0
+                y_hat = logits.astype(np.int8)
+                i_vote = y_hat.sum()
+                j_vote = 1 - i_vote
+                vote[i] += i_vote
+                vote[j] += j_vote
             # final_decision = np.argmax(vote)
             vote_list = [(index, vote[index]) for index in self.indices]
             vote_list.sort(key=lambda x : x[1], reverse=True)
@@ -194,30 +195,30 @@ class MyClustering:
         self.num_train_ = None
     
     def train_one_iter(self, trainX):
-        # if self.cluster_centers_ is None:
-        #     max_coord = np.max(trainX, axis=0)
-        #     min_coord = np.min(trainX, axis=0)
-        #     self.cluster_centers_ = np.random.uniform(low=min_coord, high=max_coord, size=(self.K, self.num_features_))
         if self.cluster_centers_ is None:
-            chosen = set()
-            _id = np.random.randint(0, trainX.shape[0])
-            chosen.add(_id)
-            self.cluster_centers_ = [trainX[_id]]
-            for i in range(self.K-1):
-                rem_idxs = []
-                probs = []
-                for j in range(trainX.shape[0]):
-                    if j in chosen: continue
-                    rem_idxs.append(j)
-                    mn = float('inf')
-                    for centr in self.cluster_centers_:
-                        dis = np.linalg.norm(trainX[j]-centr, ord=2)
-                        mn = min(mn, dis)
-                    assert mn != float('inf')
-                    probs.append(mn**2)
-                _id = np.random.choice(rem_idxs, p=probs/np.sum(probs))
-                chosen.add(_id)
-                self.cluster_centers_.append(trainX[_id])
+            max_coord = np.max(trainX, axis=0)
+            min_coord = np.min(trainX, axis=0)
+            self.cluster_centers_ = np.random.uniform(low=min_coord, high=max_coord, size=(self.K, self.num_features_))
+        # if self.cluster_centers_ is None:
+        #     chosen = set()
+        #     _id = np.random.randint(0, trainX.shape[0])
+        #     chosen.add(_id)
+        #     self.cluster_centers_ = [trainX[_id]]
+        #     for i in range(self.K-1):
+        #         rem_idxs = []
+        #         probs = []
+        #         for j in range(trainX.shape[0]):
+        #             if j in chosen: continue
+        #             rem_idxs.append(j)
+        #             mn = float('inf')
+        #             for centr in self.cluster_centers_:
+        #                 dis = np.linalg.norm(trainX[j]-centr, ord=2)
+        #                 mn = min(mn, dis)
+        #             assert mn != float('inf')
+        #             probs.append(mn**2)
+        #         _id = np.random.choice(rem_idxs, p=probs/np.sum(probs))
+        #         chosen.add(_id)
+        #         self.cluster_centers_.append(trainX[_id])
 
         norm_mat = np.zeros((self.num_train_, self.K))
         for j in range(self.num_train_):
@@ -256,18 +257,21 @@ class MyClustering:
         ''' Task 2-2 
             TODO: cluster trainX using LP(s) and store the parameters that discribe the identified clusters
         '''
-        self.num_train_, self.num_features_ = trainX.shape
-        self.labels = np.zeros(self.num_train_, dtype=int)
-        for epoch in range(iteration):
-            radius, binary_labels = self.train_one_iter(trainX)
-            # print(f"binary labels: {binary_labels[:10, :]}")
-            self.labels = np.argmax(binary_labels, axis=1)
-            for k in range(self.K):
-                class_k_indices = np.where(self.labels == k)[0]
-                if len(class_k_indices >= 0):
-                    self.cluster_centers_[k] = np.mean(trainX[class_k_indices, :], axis=0)
-            # print(f"labels are {self.labels[:10]}, cluster centers are {self.cluster_centers_}")
-            print(f'====== Finish Iteration {epoch} of K-means ======')
+        print('******* K =', self.K)
+        # self.num_train_, self.num_features_ = trainX.shape
+        # self.labels = np.zeros(self.num_train_, dtype=int)
+        # for epoch in range(iteration):
+        #     radius, binary_labels = self.train_one_iter(trainX)
+        #     # print(f"binary labels: {binary_labels[:10, :]}")
+        #     self.labels = np.argmax(binary_labels, axis=1)
+        #     for k in range(self.K):
+        #         class_k_indices = np.where(self.labels == k)[0]
+        #         if len(class_k_indices >= 0):
+        #             self.cluster_centers_[k] = np.mean(trainX[class_k_indices, :], axis=0)
+        #     # print(f"labels are {self.labels[:10]}, cluster centers are {self.cluster_centers_}")
+        #     print(f'====== Finish Iteration {epoch} of K-means ======')
+        kmeans = KMeans(n_clusters=self.K, max_iter=300).fit(trainX)
+        self.cluster_centers_, self.labels = kmeans.cluster_centers_, kmeans.labels_
         # Update and return the cluster labels of the training data (trainX)
         return self.labels
     
@@ -366,14 +370,12 @@ class MyClustering:
 ##########################################################################
 #--- Task 3 ---#
 class MyLabelSelection:
-    def __init__(self, ratio, algo = 'rand'):
+    def __init__(self, ratio, algo = 'rand', K: int = None):
         self.ratio = ratio  # percentage of data to label
         ### TODO: Initialize other parameters needed in your algorithm
         self.algo = algo
-        if self.algo == 'dis':
-            pass
-        elif self.algo == 'pseudo':
-            pass
+        if self.algo != 'rand':
+            self.K = K
         
     def select(self, trainX, debug = False):
         ''' Task 3-2'''
@@ -381,22 +383,21 @@ class MyLabelSelection:
         N = trainX.shape[0]
         M = int(N * self.ratio)
         if self.algo == 'rand':
-            return random.sample(range(N), int(N*self.ratio))
+            return random.sample(range(N), int(N*self.ratio)), None
         elif self.algo == 'dis':
             return self.distance_selection(trainX, M, debug)
         elif self.algo == 'pseudo':
-            return None
+            return self.pseudo_selection(trainX, M, debug)
         else:
             raise NotImplementedError()
     
     def distance_selection(self, trainX: np.ndarray, M: int, debug = False):
-        K = 8
-        kmeans = MyClustering(K)
-        kmeans.train(trainX, 100)
-        centroids, labels = kmeans.cluster_centers_, kmeans.labels
-        # kmeans = KMeans(n_clusters=K, max_iter=300).fit(trainX)
-        # centroids, labels = kmeans.cluster_centers_, kmeans.labels_
-        print(labels)
+        K = self.K
+        # kmeans = MyClustering(K)
+        # kmeans.train(trainX, 50)
+        # centroids, labels = kmeans.cluster_centers_, kmeans.labels
+        kmeans = KMeans(n_clusters=K, max_iter=300).fit(trainX)
+        centroids, labels = kmeans.cluster_centers_, kmeans.labels_
         dists = [[] for i in range(K)]
         idxs = [[] for i in range(K)]
         lens = [M // K for i in range(K-1)]
@@ -414,6 +415,83 @@ class MyLabelSelection:
             return ret, labels
         return ret
     
+    def pseudo_selection(self, trainX: np.ndarray, M: int, debug=True):
+        K = self.K
+        assert K == 3
+        kmeans = KMeans(n_clusters=K, max_iter=300).fit(trainX)
+        centroids, labels = kmeans.cluster_centers_, kmeans.labels_
+        # kmeans = MyClustering(K)
+        # kmeans.train(trainX, 50)
+        # centroids, labels = kmeans.cluster_centers_, kmeans.labels
+        # print(labels)
+        model = MyClassifier(K)
+        model.train(trainX, np.array(labels))
+        
+        vis = set()
+        ret = []
+        rem = M
+        N_svms = len(model.SVM_table.keys())
+        cls_to_idxs = dict()
+        for x_index in range(trainX.shape[0]):
+            x = trainX[x_index, :].reshape(1, -1)
+            vote = {}
+            for index in model.indices:
+                vote[index] = 0
+            for indices in model.SVM_table.keys():
+                i, j, _ = indices
+                svm = model.SVM_table[indices]
+                logits = x @ svm[0] + svm[1]
+                y_hat = logits > 0
+                y_hat = logits.astype(np.int8)
+                i_vote = y_hat
+                j_vote = 1 - i_vote
+                vote[i] += i_vote
+                vote[j] += j_vote
+            # final_decision = np.argmax(vote)
+            vote_list = [(index, vote[index]) for index in model.indices]
+            vote_list.sort(key=lambda x : x[1], reverse=True)
+            cla = vote_list[0][0]
+            if cla not in cls_to_idxs:
+                cls_to_idxs[cla] = [x_index]
+            else:
+                cls_to_idxs[cla].append(x_index)
+
+        for svm_id, indices in enumerate(model.SVM_table.keys()):
+            i, j, _ = indices
+            svm = model.SVM_table[indices]
+            neg_dis = []; pos_dis = []
+            pos_idxs_whole = cls_to_idxs[i]
+            neg_idxs_whole = cls_to_idxs[j]
+            pos_idxs = []; neg_idxs = []
+            for idx in pos_idxs_whole:
+                if idx in vis: continue
+                x = trainX[idx, :].reshape(1, -1)    
+                pos_dis.append((x @ svm[0] + svm[1]).squeeze())
+                pos_idxs.append(idx)
+            for idx in neg_idxs_whole:
+                if idx in vis: continue
+                x = trainX[idx, :].reshape(1, -1)    
+                neg_dis.append((x @ svm[0] + svm[1]).squeeze())
+                neg_idxs.append(idx)
+            m = rem // (N_svms - svm_id)
+            m_pos = min(m//2, len(pos_idxs)); m_neg = m - m_pos
+            pos_dis = np.array(pos_dis); neg_dis = np.array(neg_dis)
+            pos_idxs = np.array(pos_idxs, dtype=np.int32); neg_idxs = np.array(neg_idxs, dtype=np.int32)
+            pos_sort_idx = np.argsort(pos_dis)
+            neg_sort_idx = np.argsort(-neg_dis)
+            ret += pos_idxs[pos_sort_idx[:m_pos]].tolist()
+            ret += neg_idxs[neg_sort_idx[:m_neg]].tolist()
+            vis = set(ret)
+        vis = set()
+        for _id in ret:
+            assert _id >= 0 and _id < trainX.shape[0]
+            assert _id not in vis
+            vis.add(_id)
+        if debug:
+            return ret, labels
+        return ret
+            
+    
 if __name__ == '__main__':
     from utils import *
     from sklearn.decomposition import PCA
@@ -421,9 +499,10 @@ if __name__ == '__main__':
     task = 3
     
     if task is 2:
+        K = 20
         # tsne = TSNE(n_components=2, perplexity=3, verbose=1)
-        # mnist_data = prepare_mnist_data()
-        mnist_data = prepare_synthetic_data()
+        mnist_data = prepare_mnist_data()
+        # mnist_data = prepare_synthetic_data()
         num_train = len(mnist_data['trainX'])
         num_test = len(mnist_data['testX'])
         print(num_train, num_test)
@@ -434,7 +513,7 @@ if __name__ == '__main__':
         new_trainX = allX_embedded[:num_train]
         new_testX = allX_embedded[num_train:]
 
-        kmeans = MyClustering(K=3)
+        kmeans = MyClustering(K=K)
         kmeans.train(new_trainX, iteration=100)
         nmi = kmeans.evaluate_clustering(np.array(mnist_data['trainY'], dtype=int))
         acc = kmeans.evaluate_classification(
@@ -444,10 +523,10 @@ if __name__ == '__main__':
         )
         print(f"Final Train NMI: {nmi}, Test ACC: {acc}")
     elif task is 1:
-        pca = PCA(n_components=10)
-        data = prepare_synthetic_data()
-        # data = prepare_mnist_data()
-        svms = MyClassifier(K=3)
+        # pca = PCA(n_components=10)
+        # data = prepare_synthetic_data()
+        data = prepare_mnist_data()
+        svms = MyClassifier(K=3, ensemble=True)
         # svms.train_single_svm((1, 2), data['trainX'], data['trainY'])
         # new_trainX = pca.fit_transform(data['trainX'])
         # new_testX = pca.transform(data['testX'])
@@ -461,17 +540,21 @@ if __name__ == '__main__':
         # acc2 = svms.evaluate(data['trainX'], data['trainY'])
         print(f"Final Test Prediction Acc: {acc}, Train Acc: {acc2}")
     else:
-        data = prepare_synthetic_data()
-        # data = prepare_mnist_data()
-        selectors = MyLabelSelection(0.05, algo = 'dis')
+        algo = 'pseudo'
+        K = 3
+        # data = prepare_synthetic_data()
+        data = prepare_mnist_data()
+        selectors = MyLabelSelection(0.1, algo=algo, K=K)
         idxs, cluster_labels = selectors.select(data['trainX'], True)
-        model = MyClassifier(K=3)
-        print(data['trainY'][idxs])
+        model = MyClassifier(K=3, ensemble=True)
+        # print(data['trainY'][idxs])
         model.train(data['trainX'][idxs], data['trainY'][idxs])
         y_hat = model.predict(data['trainX'])
-        print(y_hat)
+        # print(y_hat)
         plt.scatter(data['trainX'][:, 0], data['trainX'][:, 1], c=y_hat)
         plt.colorbar()
+        plt.xlim((-5, 5))
+        plt.ylim((-5, 5))
         plt.savefig('predict.png'); plt.close()
         acc = model.evaluate(data['testX'], data['testY'])
         acc2 = model.evaluate(data['trainX'], data['trainY'])
@@ -480,14 +563,18 @@ if __name__ == '__main__':
         
         plt.scatter(data['trainX'][:, 0], data['trainX'][:, 1], c=data['trainY'])
         plt.colorbar()
+        plt.xlim((-5, 5))
+        plt.ylim((-5, 5))
         plt.savefig('1.png')
         plt.close()
         plt.scatter(data['trainX'][idxs, 0], data['trainX'][idxs, 1], c=data['trainY'][idxs])
         plt.colorbar()
+        plt.xlim((-5, 5))
+        plt.ylim((-5, 5))
         plt.savefig('2.png')
         plt.close()
-        plt.scatter(data['trainX'][:, 0], data['trainX'][:, 1], c=cluster_labels)
-        plt.colorbar()
-        plt.savefig('cluster.png')
-        plt.close()
+        # plt.scatter(data['trainX'][:, 0], data['trainX'][:, 1], c=cluster_labels)
+        # plt.colorbar()
+        # plt.savefig('cluster.png')
+        # plt.close()
     
