@@ -9,22 +9,20 @@ from tqdm import tqdm
 
 #--- Task 1 ---#
 class MyClassifier:  
-    def __init__(self, K, ensemble=False):
+    def __init__(self, K, ensemble=False): ## ensemble: run the classifier with different hyperparameter lambdas (corresponding to the penalty/regularization term)
         self.K = K  # number of classes
 
         ### TODO: Initialize other parameters needed in your algorithm
         # examples:
         # self.w = None
         # self.b = None
-        
-        # K SVM's ? W = [w_1, w_2, ..., w_k]
-        # objective: min()
+
         self.SVM_table = {}
         self.iteration = 100
         if ensemble:
             self.lambda_list = np.arange(0.1, 2.0, 0.5) 
         else:
-            self.lambda_list = [10.0] 
+            self.lambda_list = [1.0] 
 
     def train_single_svm(self, indices, trainX, trainY):
         i, j = indices
@@ -38,7 +36,6 @@ class MyClassifier:
         trainY_cur = trainY_ij[trainY_cur.reshape(-1)] # only keep entries where the original label == i or == j
         trainY_cur = trainY_cur.astype(np.int8)
         batch_size, feature_dim = trainX_cur.shape
-        # print(batch_size, feature_dim)
 
         for lambd in self.lambda_list:
             w = cp.Variable(feature_dim, 'w')
@@ -60,7 +57,6 @@ class MyClassifier:
             total_constraint = constraint_for_huber_loss + constraint_for_auxiliary_variable
 
             prob = cp.Problem(
-                # cp.Minimize(huber_loss/batch_size + cp.sum(auxiliary_variables_for_L1_norm)),
                 cp.Minimize(huber_loss + lambd * cp.sum(auxiliary_variables_for_L1_norm)),
                 total_constraint
             )
@@ -69,11 +65,6 @@ class MyClassifier:
             self.SVM_table[indices+(lambd, )] = (w.value, b.value)
 
         print('====== Finish solving one SVM ======')
-            # print(prob)
-            # for variable in prob.variables():
-            #     print("Variable %s: value %s" % (variable.name(), variable.value))
-
-            # objective = <x, w/||w||> - y
 
     def predict_single(self, indices, trainX, trainY):
         i, j = indices
@@ -132,7 +123,6 @@ class MyClassifier:
                 j_vote = 1 - i_vote
                 vote[i] += i_vote
                 vote[j] += j_vote
-            # final_decision = np.argmax(vote)
             vote_list = [(index, vote[index]) for index in self.indices]
             vote_list.sort(key=lambda x : x[1], reverse=True)
             final_decision = vote_list[0][0]
@@ -161,7 +151,6 @@ class MyClustering:
 
         ### TODO: Initialize other parameters needed in your algorithm
         # examples: 
-        # self.cluster_centers_ = None
         self.cluster_centers_ = None
         self.num_features_ = None
         self.num_train_ = None
@@ -212,15 +201,11 @@ class MyClustering:
             constraints
         )
         prob.solve()
-        # print(prob)
-        # for variable in prob.variables():
-        #     print("Variable %s: value %s" % (variable.name(), variable.value))
-        # print(f"Problem status: {prob.status}")
         return radius_vector.value, binary_labels.value
         
 
 
-    def train(self, trainX, iteration=10):
+    def train(self, trainX, iteration=100): ## iteration: number of iterations running the clustering algorithm
         ''' Task 2-2 
             TODO: cluster trainX using LP(s) and store the parameters that discribe the identified clusters
         '''
@@ -230,7 +215,6 @@ class MyClustering:
         self.in_class_dist_ = float('inf')
         for epoch in tqdm(range(iteration), total=iteration):
             radius, binary_labels = self.train_one_iter(trainX)
-            # print(f"binary labels: {binary_labels[:10, :]}")
             cur_labels = np.argmax(binary_labels, axis=1)
             cur_cluster_centers_ = []
             for k in range(self.K):
@@ -266,8 +250,6 @@ class MyClustering:
                 self.best_cluster_centers_ = cur_cluster_centers_
             self.labels = cur_labels
             self.cluster_centers_ = cur_cluster_centers_
-            # print(f"labels are {self.labels[:10]}, cluster centers are {self.cluster_centers_}")
-            # print(f'====== Finish Iteration {epoch} of K-means ======')
         # Update and return the cluster labels of the training data (trainX)
         if self.best_labels is not None:
             self.labels = self.best_labels
@@ -331,7 +313,11 @@ class MyClustering:
 ##########################################################################
 #--- Task 3 ---#
 class MyLabelSelection:
-    def __init__(self, ratio, algo = 'rand', K: int = None):
+    ## we provide three algorithms:
+    ##  rand: random selection
+    ##  dis: do clustering, select data points far from centriods
+    ##  pseud: use clustering to get pseudo labels, do classification, select data points near the hyperplanes
+    def __init__(self, ratio, algo = 'pseudo', K: int = None):
         self.ratio = ratio  # percentage of data to label
         ### TODO: Initialize other parameters needed in your algorithm
         self.algo = algo
