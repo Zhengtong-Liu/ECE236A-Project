@@ -444,7 +444,7 @@ if __name__ == '__main__':
     from sklearn.decomposition import PCA
     from sklearn.manifold import TSNE
     from sklearn.preprocessing import StandardScaler
-    task = 2
+    task = 3
     
     if task is 2:
         K = 32
@@ -497,39 +497,40 @@ if __name__ == '__main__':
         # acc2 = svms.evaluate(data['trainX'], data['trainY'])
         print(f"Final Test Prediction Acc: {acc}, Train Acc: {acc2}")
     else:
+        # seeds = [42, 39, 10003, 
         algo = 'pseudo'
         K = 3
         data = prepare_synthetic_data()
         # data = prepare_mnist_data()
         selectors = MyLabelSelection(0.05, algo=algo, K=K)
-        idxs, cluster_labels = selectors.select(data['trainX'], True)
+        idxs = selectors.select(data['trainX'], False)
         model = MyClassifier(K=3, ensemble=True)
         # print(data['trainY'][idxs])
         model.train(data['trainX'][idxs], data['trainY'][idxs])
-        y_hat = model.predict(data['trainX'])
+        # y_hat = model.predict(data['trainX'])
         # print(y_hat)
-        plt.scatter(data['trainX'][:, 0], data['trainX'][:, 1], c=y_hat)
-        plt.colorbar()
-        plt.xlim((-5, 5))
-        plt.ylim((-5, 5))
-        plt.savefig('predict.png'); plt.close()
+        # plt.scatter(data['trainX'][:, 0], data['trainX'][:, 1], c=y_hat)
+        # plt.colorbar()
+        # plt.xlim((-5, 5))
+        # plt.ylim((-5, 5))
+        # plt.savefig('predict.png'); plt.close()
         acc = model.evaluate(data['testX'], data['testY'])
         acc2 = model.evaluate(data['trainX'], data['trainY'])
         print(f"Final Test Prediction Acc: {acc}, Train Acc: {acc2}")
-        plt.close()
+        # plt.close()
         
-        plt.scatter(data['trainX'][:, 0], data['trainX'][:, 1], c=data['trainY'])
-        plt.colorbar()
-        plt.xlim((-5, 5))
-        plt.ylim((-5, 5))
-        plt.savefig('1.png')
-        plt.close()
-        plt.scatter(data['trainX'][idxs, 0], data['trainX'][idxs, 1], c=data['trainY'][idxs])
-        plt.colorbar()
-        plt.xlim((-5, 5))
-        plt.ylim((-5, 5))
-        plt.savefig('2.png')
-        plt.close()
+        # plt.scatter(data['trainX'][:, 0], data['trainX'][:, 1], c=data['trainY'])
+        # plt.colorbar()
+        # plt.xlim((-5, 5))
+        # plt.ylim((-5, 5))
+        # plt.savefig('1.png')
+        # plt.close()
+        # plt.scatter(data['trainX'][idxs, 0], data['trainX'][idxs, 1], c=data['trainY'][idxs])
+        # plt.colorbar()
+        # plt.xlim((-5, 5))
+        # plt.ylim((-5, 5))
+        # plt.savefig('2.png')
+        # plt.close()
         # plt.scatter(data['trainX'][:, 0], data['trainX'][:, 1], c=cluster_labels)
         # plt.colorbar()
         # plt.savefig('cluster.png')
