@@ -58,6 +58,7 @@ def plot_result(result1 = None, result2 = None, result3 = None):
         plt.ylabel('NMI', fontsize=12)
         plt.xlabel('Dataset', fontsize=12)
         plt.title("Clustering Performance on training data", fontsize=14)
+        plt.savefig('fig1.png', bbox_inches='tight', dpi=300, facecolor='white')
         plt.show()
 
 
@@ -76,24 +77,27 @@ def plot_result(result1 = None, result2 = None, result3 = None):
         plt.title("Classification Performance on testing data", fontsize=14)
         plt.ylabel('Test Accuracy', fontsize=12)
         plt.xlabel('Dataset', fontsize=12)
+        plt.savefig('fig2.png', bbox_inches='tight', dpi=300, facecolor='white')
         plt.show()
     
 
     if result3 != None: 
         plt.plot(result3['synthetic']['label_percentage'], result3['synthetic']['test_accuracy(our algo)'], label='our algo', marker='x', markersize=8)
         plt.plot(result3['synthetic']['label_percentage'], result3['synthetic']['test_accuracy(random)'], label='random selection', marker='o', markersize=8)
-        plt.ylim(0,1)
+        plt.ylim(0.5,1)
         plt.legend()
         plt.xlabel("Label Percentage", fontsize=12) 
         plt.ylabel('Test Accuracy', fontsize=12)
         plt.title("Label Selection on Synthetic Data", fontsize=14)
+        plt.savefig('fig3.png', bbox_inches='tight', dpi=300, facecolor='white')
         plt.show()
 
         plt.plot(result3['mnist']['label_percentage'], result3['mnist']['test_accuracy(our algo)'], label='our algo', marker='x', markersize=8,linewidth=2)
         plt.plot(result3['mnist']['label_percentage'], result3['mnist']['test_accuracy(random)'], label='random selection', marker='o', markersize=8, linewidth=2)
-        plt.ylim(0,1)
+        plt.ylim(0.5,1)
         plt.legend()
         plt.xlabel("Label Percentage", fontsize=12) 
         plt.ylabel('Test Accuracy', fontsize=12)
         plt.title("Label Selection on MNIST Data", fontsize=14)
+        plt.savefig('fig4.png', bbox_inches='tight', dpi=300, facecolor='white')
         plt.show()
